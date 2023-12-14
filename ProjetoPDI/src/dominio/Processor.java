@@ -16,109 +16,103 @@ public class Processor {
 		
 		ArrayList<Entity> list = new ArrayList<>();
 		
+		//Lendo a imagem
 		int[][][] im = ImageReader.imRead(file.getPath());
+		//ImageReader.imWrite(im,"C:\\Users\\joaov\\PDI\\Result\\"+ "_1_Imagem_original.png");
+		
+		//Reduzindo o tamanho da imagem
 		im = ImaJ._imResize(im);
+		//ImageReader.imWrite(im,"C:\\Users\\joaov\\PDI\\Result\\"+ "_2_Imagem_reduzida.png");
+
 		
-		int [][][] blur = ImaJ.imGaussian(im, 11);
-		
-		//im=blur;
-	
-		//int[][] im_red = ImaJ.splitChannel(im, 0);
-		//imageShow.imShow(im_red,"VERMELHO");
-		//int[][] im_green = ImaJ.splitChannel(im, 1);
-		//imageShow.imShow(im_green,"VERDE");
-		//int[][] im_blue = ImaJ.splitChannel(im, 2);
-		//imageShow.imShow(im_blue,"AZUL");
-		
-		
-		//int[][][] im_blur = ImaJ.imGaussian(im, 5);
+		//Tranformando imagem RGB em CMYK
 		int [][][] imCMYK = ImaJ.rgb2cmyk(im);
+		//ImageReader.imWrite(imCMYK,"C:\\Users\\joaov\\PDI\\Result\\"+ "_3_imagem_CMYK.png");
 
-		//int[][] im_ciano = ImaJ.splitChannel(imCMYK , 0);
-		//imageShow.imShow(im_ciano, file.getPath(), "Ciano");
 
+		//Pegando apenas o canal magenta
 		int[][] im_magenta = ImaJ.splitChannel(imCMYK, 1);
-		//imageShow.imShow(im_magenta, file.getPath(),"Magente");
+		//ImageReader.imWrite(im_magenta,"C:\\Users\\joaov\\PDI\\Result\\"+ "_4_Canal_Magenta.png");
 
-		//int[][] im_amarelo = ImaJ.splitChannel(imCMYK, 2);
-		//imageShow.imShow(im_amarelo, file.getPath(),"Amarelo");
-		
-		//int [][] im_preto = ImaJ.splitChannel(imCMYK, 3);;
-		//imageShow.imShow(im_preto, file.getPath(),"Peto");
-		
+		//Binarizando a imagem
 		boolean[][] tampas = ImaJ.im2bw(im_magenta, 100);
+		//ImageReader.imWrite(tampas,"C:\\Users\\joaov\\PDI\\Result\\"+"_5_Mascara_tampas_canal_magenta.png");
 		
-		
-		//tampas = ImaJ.imGaussian(tampas,5);
-		//Preencher buracos da tampa
+		//Removendo buracos das tampas com dilatação imagem com tampas
 		tampas = ImaJ.bwDilate(tampas, 7);
-		//Remover ruidos da imagem
+		//ImageReader.imWrite(tampas,"C:\\Users\\joaov\\PDI\\Result\\"+"_6_Tampa_dilatada.png");
+		
+		//Removendo  com erosão ruidos da imagem das tampas
 		tampas = ImaJ.bwErode(tampas, 13);
-		//imageShow.imShow(tampas, "Tampa");
+		//ImageReader.imWrite(tampas,"C:\\Users\\joaov\\PDI\\Result\\"+"_7_Tampa_erodida.png");
 		
+		//Binarizando o celular e a folha
 		boolean[][] mask = ImaJ.im2bw_inv(im_magenta);
-		//imageShow.imShow(mask,file.getPath());
+		//ImageReader.imWrite(mask,"C:\\Users\\joaov\\PDI\\Result\\"+"_8-Macara_celular_folha_canal_magenta.png");
+		
+		//Dilatação para fechar buracos do celular e plantas
 		mask = ImaJ.bwDilate(mask, 15);
-		//Remover ruidos da imagem
+		//ImageReader.imWrite(mask,"C:\\Users\\joaov\\PDI\\Result\\"+"_9_Dilatacao_celular_folha.png");
+		
+		//Erosão para remover ruidos da imagem
 		mask = ImaJ.bwErode(mask, 17);
-		//Recuperar caule
-		//mask = ImaJ.bwDilate(mask,3);
-		//imageShow.imShow(mask, "Mascara");
-		
-		//boolean[][] saida = ImaJ.sum(tampas, mask);
-		//imageShow.imShow(saida,"Saida");
-		
-
+		//ImageReader.imWrite(mask,"C:\\Users\\joaov\\PDI\\Result\\"+"_10_Erosao_celular_folha.png");
 	
-		ArrayList<Properties> sementes = ImaJ.regionProps(tampas);
-		ArrayList<Properties> sementes2 = ImaJ.regionProps(mask);
+		ArrayList<Properties> tampas_bw = ImaJ.regionProps(tampas);
+		ArrayList<Properties> celular_folha_bw = ImaJ.regionProps(mask);
 		float media = 0;
-		for(Properties s : sementes) {
-			media += s.area;
+		for(Properties tam : tampas_bw) {
+			media += tam.area;
 		}
-		media /= sementes.size();
+		media /= tampas_bw.size();
 		int cont = 0;
-		for(Properties s : sementes) {
-			if(Math.abs(media-s.area) > (media*0.01)) {
-				int[][][] im2 = ImaJ.imCrop(im, s.boundingBox[0], s.boundingBox[1], 
-						                        s.boundingBox[2], s.boundingBox[3]);
+		for(Properties tam :tampas_bw) {
+			if((tam.area > (media*0.01))) {
+				int[][][] im2 = ImaJ.imCrop(im, tam.boundingBox[0], tam.boundingBox[1], 
+						                        tam.boundingBox[2], tam.boundingBox[3]);
 				 
 				// Aplicando máscara na imagem original
 				for(int x = 0; x < im2.length; x++) {
 					for(int y = 0; y < im2[0].length; y++) {
 						//Se é pixel de fundo
-						if(!s.image[x][y]) {
+						if(!tam.image[x][y]) {
 							im2[x][y] = new int[]{0,0,0};
 						}
 					}
 				}
-				ImageReader.imWrite(im2, file.getPath().split("\\.")[0] + "_" + cont + ".png");
+				ImageReader.imWrite(im2, "C:\\Users\\joaov\\PDI\\Result\\"+ "_" + cont + ".png");
 				
-				list.add(new Entity(s.area, 1, file.getPath().split("\\.")[0] + "_" + cont + ".png", "grande"));
+				list.add(new Entity(tam.area, 1, "C:\\Users\\joaov\\PDI\\Result\\"+  "_" + cont + ".png", "Tampa"));
 				cont++;
 			}
 		}
 		
-		for(Properties s : sementes2) {
-			int[][][] im2 = ImaJ.imCrop(im, s.boundingBox[0], s.boundingBox[1], 
-					                        s.boundingBox[2], s.boundingBox[3]);
-			 
-			// Aplicando máscara na imagem original
-			for(int x = 0; x < im2.length; x++) {
-				for(int y = 0; y < im2[0].length; y++) {
-					//Se é pixel de fundo
-					if(!s.image[x][y]) {
-						im2[x][y] = new int[]{0,0,0};
+		for(Properties cf : celular_folha_bw) {
+			media += cf.area;
+		}
+		media /= celular_folha_bw.size();
+		
+		for(Properties cf : celular_folha_bw) {
+			if((cf.area > (media*0.01))) {
+				int[][][] im2 = ImaJ.imCrop(im, cf.boundingBox[0],cf.boundingBox[1], 
+						                        cf.boundingBox[2], cf.boundingBox[3]);
+				 
+				// Aplicando máscara na imagem original
+				for(int x = 0; x < im2.length; x++) {
+					for(int y = 0; y < im2[0].length; y++) {
+						//Se é pixel de fundo
+						if(!cf.image[x][y]) {
+							im2[x][y] = new int[]{0,0,0};
+						}
 					}
 				}
+				ImageReader.imWrite(im2, "C:\\Users\\joaov\\PDI\\Result\\"+ "_" + cont + ".png");
+				
+				list.add(new Entity(cf.area, 1, "C:\\Users\\joaov\\PDI\\Result\\" + "_" + cont + ".png", "grande"));	
+				cont++;
 			}
-			ImageReader.imWrite(im2, file.getPath().split("\\.")[0] + "_" + cont + ".png");
 			
-			list.add(new Entity(s.area, 1, file.getPath().split("\\.")[0] + "_" + cont + ".png", "grande"));	
-			cont++;
-			
-		}
-		
+		}	
 		return list;
 		
 	}
